@@ -1,47 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MEDCHECK PI | Operator</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MEDCHECK-PI | Admin Control Panel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}" />
 </head>
 <body>
-  <main class="operator-shell">
-    <header class="operator-header">
-      <div><p class="eyebrow">SMART MEDICINE INSPECTION SYSTEM</p><h1>MEDCHECK <span>PI</span></h1></div>
-      <div class="connection"><i id="camera-dot"></i><span id="camera-status">USB WEBCAM CHECKING</span></div>
+  <div class="admin-shell">
+    <header class="admin-header">
+      <h1>MEDCHECK-PI</h1>
+      <p>OPERATOR CONTROL MATRIX</p>
     </header>
 
-    <section class="capture-card">
-      <div class="section-title"><span>01</span><div><p class="eyebrow">CURRENT SAMPLE</p><h2>CAPTURED PACKAGE</h2></div></div>
-      <div class="capture-image">
-        <img id="operator-image" alt="Captured rear-side medicine package" hidden>
-        <div id="operator-image-empty" class="empty-state">Waiting for laptop capture</div>
-        <div id="operator-scan-overlay" class="scan-overlay hidden"><span class="scan-line"></span><b>ANALYZING IMAGE</b></div>
+    <!-- STATUS INDICATOR (Translucent Black & White) -->
+    <div class="admin-status-wrap">
+      <div class="admin-status-label">SYSTEM STATE</div>
+      <div id="admin-status-display" class="admin-status-display">
+        SYSTEM READY
       </div>
-      <div class="recognition">
-        <span class="eyebrow">MEDICINE RECOGNITION</span>
-        <strong id="operator-classification">WAITING FOR CAPTURE</strong>
-        <small id="operator-confidence" class="confidence-label" hidden></small>
-        <p id="operator-message">Capture the rear side using the laptop keyboard, then analyze it.</p>
-        <p id="operator-observation" class="observation"></p>
-        <p class="supported-name">Supported reference: Iron and Folic Acid Tablets IP</p>
+    </div>
+
+    <!-- PRESET MEDICINE PROFILE SELECTOR & DETAILS -->
+    <section class="admin-medicine-card" id="admin-medicine-card">
+      <div class="med-card-header">
+        <span class="med-tag">DETECTED MEDICINE PROFILE</span>
+        <div class="med-chips-row" id="med-chips-row">
+          <!-- Populated by JavaScript with preset medicines -->
+        </div>
+      </div>
+
+      <div class="med-details-body">
+        <div class="med-main-title" id="admin-med-name">DOLO 650</div>
+        <div class="med-sub-title" id="admin-med-generic">Paracetamol Tablets IP 650mg</div>
+
+        <div class="med-meta-grid">
+          <div class="med-meta-item">
+            <span class="meta-label">MANUFACTURER</span>
+            <span class="meta-val" id="admin-med-mfr">Micro Labs Limited</span>
+          </div>
+          <div class="med-meta-item">
+            <span class="meta-label">BATCH & EXPIRY</span>
+            <span class="meta-val" id="admin-med-batch">DL-24891A (EXP: 02/2028)</span>
+          </div>
+          <div class="med-meta-item">
+            <span class="meta-label">COMPOSITION</span>
+            <span class="meta-val" id="admin-med-comp">Paracetamol IP 650 mg</span>
+          </div>
+          <div class="med-meta-item">
+            <span class="meta-label">SECURITY MARKERS</span>
+            <span class="meta-val" id="admin-med-security">Alu-Alu Blister | Micro-text, Hologram, 2D DataMatrix</span>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="decision-card">
-      <div class="section-title"><span>02</span><div><p class="eyebrow">OPERATOR ACTION</p><h2>REVIEW RESULT</h2></div></div>
-      <div class="button-stack">
-        <button id="analyze-button" class="action analyze" type="button" disabled>ANALYZE IMAGE</button>
-        <button class="action real decision" data-result="REAL" type="button" disabled>REAL</button>
-        <button class="action counterfeit decision" data-result="COUNTERFEIT" type="button" disabled>COUNTERFEIT</button>
-      </div>
-      <p class="decision-note">REAL and COUNTERFEIT are manual demo decisions, not authenticity verification.</p>
-      <div class="current-result"><span>Latest decision</span><strong id="operator-result">NOT SELECTED</strong></div>
-    </section>
-    <footer><span id="socket-status">Connecting to laptop…</span><span>Same local Wi-Fi network</span></footer>
-  </main>
+    <!-- EXACTLY THREE BUTTONS (BLACK & WHITE TRANSPARENT / VISIBLE) -->
+    <div class="admin-buttons-row">
+      <button id="btn-counterfeit" class="admin-btn btn-counterfeit" type="button">
+        COUNTERFEIT
+      </button>
+
+      <button id="btn-real" class="admin-btn btn-real" type="button">
+        REAL
+      </button>
+
+      <button id="btn-no-medicine" class="admin-btn btn-no-medicine" type="button">
+        NO MEDICINE FOUND
+      </button>
+    </div>
+
+    <div id="admin-toast" class="admin-toast"></div>
+  </div>
+
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="{{ url_for('static', filename='js/admin_dashboard.js') }}"></script>
 </body>

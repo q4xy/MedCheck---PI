@@ -1,50 +1,37 @@
-from __future__ import annotations
-
-import socket
 from pathlib import Path
+import socket
 
 BASE_DIR = Path(__file__).resolve().parent
-PROJECT_NAME = "MEDCHECK PI"
-PROJECT_SUBTITLE = "SMART MEDICINE INSPECTION SYSTEM"
 
-FLASK_HOST = "0.0.0.0"
-FLASK_PORT = 8000
-SECRET_KEY = "medcheck-pi-local-demo"
-
-# Only this configured external USB camera index is opened. No fallback is used.
+# External USB Webcam configuration
+# If USB camera is index 1, set to 1; if index 0, set to 0.
 USB_CAMERA_INDEX = 1
-CAMERA_BACKEND = "DSHOW"
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
-ALLOW_INTERNAL_CAMERA_FALLBACK = False
 
+# Network Configuration
+# Listening on 0.0.0.0 allows access from mobile devices and other laptops on the same Wi-Fi.
+FLASK_HOST = "0.0.0.0"
+FLASK_PORT = 8000
+
+# ESP32 Serial Communication (DevKit with 1.3" SH1106 OLED)
 SERIAL_PORT = "COM4"
 SERIAL_BAUD_RATE = 115200
-OLED_WIDTH = 128
-OLED_HEIGHT = 64
-OLED_I2C_ADDRESS = 0x3C
 
+# Active scan image path (only single current image, no history)
 IMAGE_STORAGE_DIR = BASE_DIR / "captures"
-DATASET_DIR = BASE_DIR / "dataset"
-TRAIN_DATASET_DIR = DATASET_DIR / "train"
-VALIDATION_DATASET_DIR = DATASET_DIR / "validation"
-MEDICINE_REFERENCE_MANIFEST = DATASET_DIR / "reference" / "medicines.json"
-MEDICINE_REFERENCE_IMAGE = DATASET_DIR / "reference" / "iron_folic_acid_reference.jpg"
-MODEL_PATH = BASE_DIR / "intelligence" / "model" / "trained_model.keras"
-HISTORY_PATH = BASE_DIR / "logs" / "inspection_history.json"
-LOG_DIRECTORY = BASE_DIR / "logs"
-MAX_IMAGE_BYTES = 12 * 1024 * 1024
-ANALYSIS_CONFIDENCE_THRESHOLD = 0.85
-REFERENCE_MATCH_THRESHOLD = 0.32
-LOG_LEVEL = "INFO"
+CURRENT_SCAN_FILENAME = "current_scan.jpg"
 
 
 def get_local_ip() -> str:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    """Detect the local machine's LAN IP address for cross-device access."""
     try:
-        sock.connect(("192.0.2.1", 80))
-        return str(sock.getsockname()[0])
-    except OSError:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.5)
+        # Does not actually connect but determines routing interface
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
         return "127.0.0.1"
-    finally:
-        sock.close()

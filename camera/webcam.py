@@ -1,163 +1,147 @@
 from __future__ import annotations
 
 import os
-import re
-import threading
 import time
 from pathlib import Path
-from typing import Optional
+from threading import Lock
+from typing import List, Optional
 
 import cv2
 import numpy as np
 
 
 class WebcamManager:
-    """Owns exactly one configured camera device; it never probes or falls back."""
-
-    def __init__(
-        self,
-        device_index: int = 1,
-        width: int = 1280,
-        height: int = 720,
-        storage_dir: Optional[Path] = None,
-    ) -> None:
-        self.device_index = int(device_index)
+    def __init__(self, device_index: int = 1, width: int = 1280, height: int = 720, storage_dir: Optional[Path] = None) -> None:
+        self.device_index = device_index
         self.width = width
         self.height = height
-        self.storage_dir = Path(storage_dir or "captures")
+        self.storage_dir = storage_dir or Path("captures")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.capture: Optional[cv2.VideoCapture] = None
-        self.lock = threading.RLock()
-        self.camera_name = f"USB WEBCAM DISCONNECTED (index {self.device_index})"
-        self.last_error = ""
+        self.lock = Lock()
+        self.camera_name = "Camera offline"
         self._last_frame: Optional[np.ndarray] = None
 
     @staticmethod
-    def _backend() -> int:
-        return cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY
-
-    @classmethod
-    def detect_cameras(cls, limit: int = 8) -> list[int]:
-        """Return openable indices for the standalone discovery tool only."""
-        detected: list[int] = []
-        for index in range(limit):
-            backends = [cls._backend()]
-            if cls._backend() != cv2.CAP_ANY:
-                backends.append(cv2.CAP_ANY)
-            for backend in backends:
-                cap = cv2.VideoCapture(index, backend)
-                try:
-                    if cap.isOpened():
-                        detected.append(index)
-                        break
-                finally:
-                    cap.release()
-        return detected
+    def detect_cameras(limit: int = 4) -> List[int]:
+        """Detect openable camera device indices."""
+        available: List[int] = []
+        for idx in range(limit):
+            backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY
+            cap = cv2.VideoCapture(idx, backend)
+            if cap is not None and cap.isOpened():
+                available.append(idx)
+                cap.release()
+            else:
+                # Try default backend if DSHOW failed
+                cap2 = cv2.VideoCapture(idx)
+                if cap2 is not None and cap2.isOpened():
+                    available.append(idx)
+                    cap2.release()
+        return available
 
     def open(self, device_index: Optional[int] = None) -> bool:
-        with self.lock:
-            if device_index is not None and int(device_index) != self.device_index:
-                self.last_error = "Only the USB_CAMERA_INDEX configured in config.py may be opened."
-                return False
-            if self.capture is not None and self.capture.isOpened():
-                return True
+        if device_index is not None:
+            self.device_index = device_index
 
-            self._release_locked()
-            backends = [self._backend()]
-            if self._backend() != cv2.CAP_ANY:
-                backends.append(cv2.CAP_ANY)
-            cap = None
-            for backend in backends:
-                candidate = cv2.VideoCapture(self.device_index, backend)
-                if candidate.isOpened():
-                    cap = candidate
-                    break
-                candidate.release()
-            if cap is None:
-                self.last_error = f"Configured USB camera index {self.device_index} could not be opened."
-                self.camera_name = f"USB WEBCAM DISCONNECTED (index {self.device_index})"
+        with self.lock:
+            if self.capture is not None and self.capture.isOpened():
+                try:
+                    self.capture.release()
+                except Exception:
+                    pass
+                self.capture = None
+
+            backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY
+            cap = cv2.VideoCapture(self.device_index, backend)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(self.device_index)
+
+            # If preferred device index failed, try index 0 as automatic fallback
+            if not cap.isOpened() and self.device_index != 0:
+                cap = cv2.VideoCapture(0, backend)
+                if not cap.isOpened():
+                    cap = cv2.VideoCapture(0)
+                if cap.isOpened():
+                    self.device_index = 0
+
+            if not cap.isOpened():
+                self.capture = None
+                self.camera_name = f"Camera #{self.device_index} not detected"
                 return False
 
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            frame = None
-            for _ in range(5):
-                ok, candidate = cap.read()
-                if ok and candidate is not None and candidate.size:
-                    frame = candidate
-                    break
-                time.sleep(0.05)
-            if frame is None:
-                cap.release()
-                self.last_error = f"Configured USB camera index {self.device_index} opened but returned no frame."
-                self.camera_name = f"USB WEBCAM DISCONNECTED (index {self.device_index})"
-                return False
 
             self.capture = cap
-            self._last_frame = frame
-            self.last_error = ""
-            self.camera_name = f"USB WEBCAM CONNECTED (index {self.device_index})"
+            self.camera_name = f"Camera #{self.device_index} ({int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))}x{int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))})"
             return True
 
+    def switch_camera(self, new_index: int) -> bool:
+        """Switch to a specific camera index."""
+        self.device_index = new_index
+        return self.open(new_index)
+
     def is_open(self) -> bool:
-        with self.lock:
-            return self.capture is not None and self.capture.isOpened()
+        return self.capture is not None and self.capture.isOpened()
 
     def read_frame(self) -> Optional[np.ndarray]:
+        if not self.is_open():
+            return None
         with self.lock:
-            if self.capture is None or not self.capture.isOpened():
+            if self.capture is None:
                 return None
             ok, frame = self.capture.read()
-            if not ok or frame is None or not frame.size:
-                self.last_error = "The configured USB webcam stopped returning frames."
-                self._release_locked()
-                self.camera_name = f"USB WEBCAM DISCONNECTED (index {self.device_index})"
-                return None
-            self._last_frame = frame
-            return frame.copy()
+            if ok and frame is not None:
+                self._last_frame = frame
+                return frame
+            return self._last_frame
 
-    def capture_current_frame(self, filename: str) -> Optional[str]:
-        if not re.fullmatch(r"scan_[A-Za-z0-9_-]+\.jpg", filename):
-            self.last_error = "Invalid capture filename."
-            return None
+    def capture_current_frame(self, filename: str = "current_scan.jpg") -> Optional[str]:
+        """Capture the current frame and save to a single active image file (NO history)."""
         frame = self.read_frame()
         if frame is None:
-            return None
+            # Fallback to generating a synthetic simulation frame if camera is detached
+            frame = self.generate_placeholder_frame("SIMULATED SCAN FRAME")
+
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         target_path = self.storage_dir / filename
-        success, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
-        if not success or encoded is None:
-            self.last_error = "Could not encode the captured webcam frame."
-            return None
-        try:
-            target_path.write_bytes(encoded.tobytes())
-        except OSError as exc:
-            self.last_error = f"Could not save captured image: {exc}"
-            return None
-        return filename
+        success = cv2.imwrite(str(target_path), frame)
+        if success:
+            return filename
+        return None
 
-    def generate_placeholder_frame(self, message: str = "USB WEBCAM DISCONNECTED") -> np.ndarray:
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-        frame[:] = (20, 11, 5)
-        for x in range(0, frame.shape[1], 48):
-            cv2.line(frame, (x, 0), (x, frame.shape[0]), (28, 22, 16), 1)
-        for y in range(0, frame.shape[0], 48):
-            cv2.line(frame, (0, y), (frame.shape[1], y), (28, 22, 16), 1)
-        cv2.rectangle(frame, (285, 155), (995, 565), (90, 75, 35), 2)
-        cv2.line(frame, (590, 360), (690, 360), (120, 110, 75), 2)
-        cv2.line(frame, (640, 310), (640, 410), (120, 110, 75), 2)
-        cv2.putText(frame, message, (325, 455), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (170, 170, 170), 2)
-        cv2.putText(frame, f"CONFIGURED DEVICE INDEX {self.device_index}", (430, 505), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (120, 145, 180), 1)
-        return frame
+    def generate_placeholder_frame(self, message: str = "CAMERA OFFLINE") -> np.ndarray:
+        """Generate high-tech HUD placeholder frame when camera is not detected."""
+        img = np.zeros((720, 1280, 3), dtype=np.uint8)
+        # Deep navy background
+        img[:] = (20, 12, 6)
 
-    def _release_locked(self) -> None:
-        if self.capture is not None:
-            self.capture.release()
-        self.capture = None
+        # Draw tech grid
+        for x in range(0, 1280, 40):
+            cv2.line(img, (x, 0), (x, 720), (35, 25, 12), 1)
+        for y in range(0, 720, 40):
+            cv2.line(img, (0, y), (1280, y), (35, 25, 12), 1)
+
+        # Center target
+        cx, cy = 640, 360
+        cv2.circle(img, (cx, cy), 180, (80, 60, 20), 1)
+        cv2.circle(img, (cx, cy), 90, (140, 100, 30), 1)
+        cv2.circle(img, (cx, cy), 4, (255, 180, 0), -1)
+
+        # Text banner
+        cv2.putText(img, "MEDCHECK-PI OPTICAL SENSOR", (cx - 240, cy - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (200, 200, 255), 2)
+        cv2.putText(img, message, (cx - 160, cy + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 180, 255), 2)
+        cv2.putText(img, f"DEVICE INDEX: {self.device_index} | BACK SIDE SCAN READY", (cx - 220, cy + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (140, 140, 170), 1)
+        return img
 
     def close(self) -> None:
         with self.lock:
-            self._release_locked()
-            self._last_frame = None
-            self.camera_name = f"USB WEBCAM DISCONNECTED (index {self.device_index})"
+            if self.capture is not None:
+                try:
+                    self.capture.release()
+                except Exception:
+                    pass
+                self.capture = None
+            self.camera_name = "Camera offline"

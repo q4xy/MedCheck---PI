@@ -1,66 +1,185 @@
+/**
+ * MEDCHECK-PI — ADMIN CONTROL PANEL JAVASCRIPT
+ * Black & White, Transparent/Visible, Pre-set Medicine Profile Management.
+ */
+
 document.addEventListener("DOMContentLoaded", () => {
-  const socket = io({ reconnection: true, reconnectionDelay: 1000 });
-  const analyzeButton = document.getElementById("analyze-button");
-  const decisions = document.querySelectorAll(".decision");
-  const image = document.getElementById("operator-image");
-  const imageEmpty = document.getElementById("operator-image-empty");
-  const scanOverlay = document.getElementById("operator-scan-overlay");
-  const cameraDot = document.getElementById("camera-dot");
+  const socket = io({
+    transports: ["polling", "websocket"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+  });
 
-  const updateState = (payload) => {
-    if (!payload) return;
-    document.getElementById("camera-status").textContent = payload.camera_connected
-      ? "USB WEBCAM CONNECTED"
-      : "USB WEBCAM DISCONNECTED";
-    cameraDot.classList.toggle("connected", Boolean(payload.camera_connected));
-    document.getElementById("operator-classification").textContent =
-      payload.classification || "WAITING FOR CAPTURE";
-    const confidence = document.getElementById("operator-confidence");
-    if (Number.isFinite(payload.analysis_confidence) && payload.analysis_confidence_label) {
-      confidence.textContent = `${payload.analysis_confidence_label}: ${Math.round(payload.analysis_confidence * 100)}%`;
-      confidence.hidden = false;
-    } else {
-      confidence.textContent = "";
-      confidence.hidden = true;
-    }
-    document.getElementById("operator-message").textContent =
-      payload.analysis_message || "Capture the rear side using the laptop keyboard, then analyze it.";
-    document.getElementById("operator-observation").textContent = payload.red_mark_detected
-      ? (payload.red_mark_observation || "Red-colored marking detected near the lower printed information area.")
-      : "";
-    document.getElementById("operator-result").textContent = payload.selected_result || "NOT SELECTED";
-    scanOverlay.classList.toggle("hidden", payload.scan_state !== "ANALYZING");
+  const statusDisplay = document.getElementById("admin-status-display");
+  const toastMessage = document.getElementById("admin-toast");
+  const chipsRow = document.getElementById("med-chips-row");
 
-    const hasCapture = Boolean(payload.captured_image_url);
-    analyzeButton.disabled = !hasCapture || Boolean(payload.analysis_running);
-    const accepted = Boolean(payload.image_accepted) && payload.classification === "SUPPORTED MEDICINE FOUND";
-    decisions.forEach((button) => { button.disabled = !accepted; });
-    if (hasCapture) {
-      image.src = `${payload.captured_image_url}?t=${payload.last_update_ts || Date.now()}`;
-      image.hidden = false;
-      imageEmpty.hidden = true;
-    } else {
-      image.removeAttribute("src");
-      image.hidden = true;
-      imageEmpty.hidden = false;
+  // Medicine profile elements
+  const medName = document.getElementById("admin-med-name");
+  const medGeneric = document.getElementById("admin-med-generic");
+  const medMfr = document.getElementById("admin-med-mfr");
+  const medBatch = document.getElementById("admin-med-batch");
+  const medComp = document.getElementById("admin-med-comp");
+  const medSecurity = document.getElementById("admin-med-security");
+
+  // Buttons
+  const btnCounterfeit = document.getElementById("btn-counterfeit");
+  const btnReal = document.getElementById("btn-real");
+  const btnNoMedicine = document.getElementById("btn-no-medicine");
+
+  let activeMedicineId = "dolo650";
+  let presetMedicines = [];
+
+  const triggerHaptic = () => {
+    if ("vibrate" in navigator) {
+      try {
+        navigator.vibrate(35);
+      } catch (e) {}
     }
   };
 
-  analyzeButton.addEventListener("click", () => {
-    if (!analyzeButton.disabled) socket.emit("analyze_image");
-  });
-  decisions.forEach((button) => {
-    button.addEventListener("click", () => {
-      if (!button.disabled) socket.emit("select_result", { result: button.dataset.result });
+  const showToast = (msg) => {
+    if (toastMessage) {
+      toastMessage.textContent = msg;
+      setTimeout(() => {
+        if (toastMessage.textContent === msg) {
+          toastMessage.textContent = "";
+        }
+      }, 3000);
+    }
+  };
+
+  const updateStatusDisplay = (status, result) => {
+    if (!statusDisplay) return;
+
+    statusDisplay.className = "admin-status-display";
+
+    if (result === "COUNTERFEIT") {
+      statusDisplay.textContent = "VERDICT: COUNTERFEIT";
+      statusDisplay.classList.add("active-result");
+    } else if (result === "REAL") {
+      statusDisplay.textContent = "VERDICT: REAL";
+      statusDisplay.classList.add("active-result");
+    } else if (result === "NO MEDICINE FOUND") {
+      statusDisplay.textContent = "VERDICT: NO MEDICINE FOUND";
+      statusDisplay.classList.add("active-result");
+    } else if (status === "SCANNING") {
+      statusDisplay.textContent = "AI SCANNING IN PROGRESS...";
+      statusDisplay.classList.add("scanning");
+    } else {
+      statusDisplay.textContent = "SYSTEM READY";
+    }
+  };
+
+  const renderMedicineDetails = (med) => {
+    if (!med) return;
+    activeMedicineId = med.id;
+
+    if (medName) medName.textContent = med.name || "Medicine";
+    if (medGeneric) medGeneric.textContent = med.generic || "";
+    if (medMfr) medMfr.textContent = med.manufacturer || "N/A";
+    if (medBatch) medBatch.textContent = `${med.batch_no || "N/A"} (EXP: ${med.exp_date || "N/A"})`;
+    if (medComp) medComp.textContent = med.composition || "N/A";
+    if (medSecurity) medSecurity.textContent = `${med.packaging || ""} | ${med.security_features || ""}`;
+
+    // Highlight active chip
+    document.querySelectorAll(".med-chip-btn").forEach((chip) => {
+      chip.classList.toggle("active", chip.dataset.id === med.id);
     });
+  };
+
+  const buildMedicineChips = (medList, currentMed) => {
+    if (!chipsRow || !medList || !medList.length) return;
+    presetMedicines = medList;
+    chipsRow.innerHTML = "";
+
+    medList.forEach((med) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "med-chip-btn";
+      chip.dataset.id = med.id;
+      chip.textContent = med.name;
+
+      if (currentMed && currentMed.id === med.id) {
+        chip.classList.add("active");
+      }
+
+      chip.addEventListener("click", () => {
+        triggerHaptic();
+        activeMedicineId = med.id;
+        renderMedicineDetails(med);
+        socket.emit("select_medicine", { id: med.id });
+        showToast(`Profile set to ${med.name}`);
+      });
+
+      chipsRow.appendChild(chip);
+    });
+  };
+
+  // Button 1: COUNTERFEIT
+  btnCounterfeit.addEventListener("click", () => {
+    triggerHaptic();
+    socket.emit("select_result", { result: "COUNTERFEIT", medicine_id: activeMedicineId });
+    updateStatusDisplay("RESULT", "COUNTERFEIT");
+    showToast("Submitted: COUNTERFEIT");
   });
 
-  socket.on("inspection_updated", updateState);
-  socket.on("capture_completed", updateState);
-  socket.on("analysis_started", updateState);
-  socket.on("analysis_completed", updateState);
-  socket.on("operator_decision", updateState);
-  socket.on("connect", () => { document.getElementById("socket-status").textContent = "Connected to laptop"; });
-  socket.on("disconnect", () => { document.getElementById("socket-status").textContent = "Reconnecting…"; });
-  socket.on("connect_error", () => { document.getElementById("socket-status").textContent = "Cannot connect to laptop"; });
+  // Button 2: REAL
+  btnReal.addEventListener("click", () => {
+    triggerHaptic();
+    socket.emit("select_result", { result: "REAL", medicine_id: activeMedicineId });
+    updateStatusDisplay("RESULT", "REAL");
+    showToast("Submitted: REAL");
+  });
+
+  // Button 3: NO MEDICINE FOUND
+  btnNoMedicine.addEventListener("click", () => {
+    triggerHaptic();
+    socket.emit("select_result", { result: "NO MEDICINE FOUND", medicine_id: activeMedicineId });
+    updateStatusDisplay("RESULT", "NO MEDICINE FOUND");
+    showToast("Submitted: NO MEDICINE FOUND");
+  });
+
+  // Socket state listeners
+  socket.on("inspection_updated", (state) => {
+    if (!state) return;
+
+    if (state.preset_medicines && state.preset_medicines.length) {
+      if (!chipsRow.children.length) {
+        buildMedicineChips(state.preset_medicines, state.current_medicine);
+      }
+    }
+
+    if (state.current_medicine) {
+      renderMedicineDetails(state.current_medicine);
+    }
+
+    if (state.scan_state === "SCANNING") {
+      updateStatusDisplay("SCANNING", null);
+    } else if (state.scan_state === "RESULT" && state.selected_result) {
+      updateStatusDisplay("RESULT", state.selected_result);
+    } else {
+      updateStatusDisplay("READY", null);
+    }
+  });
+
+  socket.on("scan_started", (data) => {
+    updateStatusDisplay("SCANNING", null);
+    if (data.medicine) {
+      renderMedicineDetails(data.medicine);
+    }
+    showToast("Scan active: Select verification decision");
+  });
+
+  socket.on("result_selected", (data) => {
+    updateStatusDisplay("RESULT", data.result);
+    if (data.medicine) {
+      renderMedicineDetails(data.medicine);
+    }
+  });
+
+  socket.on("scan_reset", () => {
+    updateStatusDisplay("READY", null);
+  });
 });

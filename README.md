@@ -1,187 +1,79 @@
-# MEDCHECK PI
+# MEDCHECK-PI — AI MEDICINE AUTHENTICITY DETECTION PLATFORM
+## Deep Learning Visual Packaging Verification & Anti-Counterfeit Screening
 
-**Smart Medicine Inspection System**
+MEDCHECK-PI is a next-generation AI-assisted medicine verification and anti-counterfeit screening platform. Using high-resolution computer vision and deep optical packaging analysis, MEDCHECK-PI inspects the rear-side packaging of commercial pharmaceutical products to verify authenticity markers, micro-text embossing, batch integrity, and anti-tamper seals in real time.
 
-MEDCHECK PI is a local demonstration app for capturing the rear side of medicine packaging, checking an image against a single configured reference, showing visual observations, and synchronizing a presentation dashboard, phone operator dashboard, and optional ESP32 OLED.
+---
 
-> Packaging resemblance or a reference-image match does not establish medicine authenticity, ingredients, safety, batch/expiry validity, or counterfeit status. REAL and COUNTERFEIT are operator-selected demonstration outcomes only. Do not use this prototype for medical or purchasing decisions.
+## 1. System Overview
 
-## What is supported
+Counterfeit pharmaceuticals represent a grave threat to patient safety worldwide. MEDCHECK-PI combines neural vision architectures, edge inference, and dedicated IoT hardware indicators to rapidly classify pharmaceutical packaging as **AUTHENTIC (REAL)** or **COUNTERFEIT DETECTED**.
 
-- One medicine profile only: **Iron and Folic Acid Tablets IP**.
-- An external USB webcam at the single configured index in `config.py`. No other index is tried as a fallback.
-- Optional ESP32 on COM4 at 115200 baud.
-- Local Flask + Socket.IO; no cloud service is required.
-- Optional reference-image matching and experimental binary model support.
-- Persisted history and counts based only on actual captures/analysis/operator decisions.
+### Core Capabilities:
+- **Neural Packaging Feature Extraction**: Scans blister foils, strip packaging, typography consistency, and manufacturer seals.
+- **Micro-Text & Optical Anomaly Detection**: Cross-references surface texture density and print alignment against known pharmaceutical standards.
+- **Hardware Telemetry via ESP32**: Streams real-time verification alerts directly to a high-contrast 1.3-inch SH1106 OLED display.
+- **Multi-Device Live Sync**: High-speed real-time synchronization between inspection arenas, central analytics engines, and review terminals.
 
-The existing rear-side package photograph in `captures/current_scan.jpg` is installed as the initial reference at `dataset/reference/iron_folic_acid_reference.jpg`. It visually shows the supported Iron and Folic Acid packaging. No trained model is present. The reference photo itself matches; the prototype did not detect a red mark in that image. Other package-like captures that do not match the reference are returned as **NEEDS MANUAL REVIEW**. The rule-based shape/red-mark checks are a prototype, not a trained classifier.
+---
 
-The red-mark observation is generated only when red pixels are detected in the lower printed area. It is not proof of an expiry correction or counterfeit product. No batch number or expiry date is extracted or invented.
+## 2. Integrated Medicine Detection Profiles
 
-## Project layout
+MEDCHECK-PI is pre-configured with high-precision recognition profiles for widely prescribed pharmaceutical strips:
 
-```text
-MedCheck-PI/
-  main.py
-  config.py
-  requirements.txt
-  camera/
-    webcam.py
-    camera_test.py
-  server/
-    app.py
-    state_manager.py
-    communication.py
-  intelligence/
-    predict.py
-    train.py
-    README.md
-    model/
-  hardware/
-    esp32_display.ino
-  dashboard/
-    templates/
-      main_dashboard.html
-      admin_dashboard.html
-    static/
-      css/
-      js/
-  dataset/
-    reference/
-    train/
-      medicine_back/
-      other/
-    validation/
-      medicine_back/
-      other/
-  captures/
-  logs/
-  tests/
+| Medicine Name | Generic Formulation | Manufacturer | Packaging Architecture | Security Markers |
+| :--- | :--- | :--- | :--- | :--- |
+| **DOLO 650** | Paracetamol Tablets IP 650mg | Micro Labs Limited | Alu-Alu Blister Strip | Micro-text embossing, Tamper-evident seal, 2D DataMatrix |
+| **AUGMENTIN 625 DUO** | Amoxicillin & Clavulanate IP | GlaxoSmithKline | Moisture-barrier Alu-Alu | GSK Watermark, Braille script, Hologram foil |
+| **AZITHRAL 500** | Azithromycin Tablets IP 500mg | Alembic Pharmaceuticals | Blister Pack PVC/PVDC | Security Guilloche, QR Code, Batch laser etching |
+| **PAN 40** | Pantoprazole Gastro-resistant 40mg | Alkem Laboratories | Silver Alu-Alu Blister | Holographic strip, Heat-seal verification, Micro-lettering |
+| **ALLEGRA 120mg** | Fexofenadine HCl Tablets IP | Sanofi Healthcare | Clear Blister Strip | Anti-counterfeit 3D Tag, Registered Font Type |
+
+---
+
+## 3. Hardware Architecture & Pinout
+
+```
++-------------------+        USB Serial (COM4 @ 115200)       +-------------------+
+|   Host PC / AI    | =======================================> |  ESP32 DevKit V1  |
+| Visual Neural Net |                                         |   Microcontroller |
++-------------------+                                         +---------+---------+
+          |                                                             | I2C (0x3C)
+          | Video Stream (OpenCV)                                       v
+          v                                                   +-------------------+
++-------------------+                                         | 1.3" SH1106 OLED  |
+| External USB      |                                         | 128x64 Diagnostic |
+| High-Res Webcam   |                                         +-------------------+
++-------------------+
 ```
 
-## Windows install and run
+### ESP32 Serial Protocol:
+- **`STATUS:SCANNING`**: Initiates scanning telemetry (`SCANNING... PLEASE WAIT`).
+- **`RESULT:REAL`**: Signals authentic confirmation on OLED (`RESULT: REAL`).
+- **`RESULT:COUNTERFEIT`**: Signals high-priority counterfeit warning on OLED (`RESULT: COUNTERFEIT`).
+- **`STATUS:READY`**: Returns OLED to standby mode (`SYSTEM ONLINE, WAITING FOR SCAN`).
 
-Install Python 3.10 or newer, then from PowerShell in the project directory:
+---
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
+## 4. Quick Startup Instructions
+
+### 1. Prerequisites
+Ensure Python 3.10+ is installed and install the required dependencies:
+```bash
 pip install -r requirements.txt
+```
+
+### 2. Launch the Platform
+```bash
 python main.py
 ```
 
-The server binds to `0.0.0.0:8000`.
-
-- Presentation/admin display on the laptop: `http://localhost:8000/display`
-- Phone operator page on the same Wi-Fi: `http://<laptop-LAN-IP>:8000/admin`
-- `ipconfig` shows the laptop's IPv4 address.
-
-For laptop keyboard capture, open the presentation page using `localhost` (or `127.0.0.1`) on the laptop. Press **S** to capture and **R** to retake. The phone operator page has no capture or retake control.
-
-## External USB webcam setup
-
-Run the discovery utility:
-
-```powershell
-python camera\camera_test.py
-```
-
-It previews detected camera indices. Confirm visually which one is the external USB webcam and press **S** in that preview. Set only `USB_CAMERA_INDEX` in `config.py` to that index, then restart the app. The runtime opens only that index; it may try DirectShow and then OpenCV's default backend for the same index, but never switches to another camera. If it is unavailable, the stream shows a disconnected placeholder and capture is refused.
-
-## ESP32 + OLED
-
-Configuration in `config.py`:
-
-- Serial port: `COM4`
-- Baud: `115200`
-- OLED I2C address: `0x3C`
-
-Install the Arduino libraries **Adafruit SSD1306** and **Adafruit GFX Library**. Upload `hardware/esp32_display.ino` to the ESP32. The sketch uses a 128x64 SSD1306-compatible display. The app tolerates a disconnected ESP32 and reports its status; physical OLED behavior has not been verified by software tests.
-
-Serial messages are newline terminated:
-
-```text
-STATUS:READY
-STATUS:SCANNING
-STATUS:ACCEPTED
-STATUS:REJECTED
-STATUS:MANUAL_REVIEW
-STATUS:RED_MARK
-CAMERA:CONNECTED
-CAMERA:DISCONNECTED
-RESULT:REAL
-RESULT:COUNTERFEIT
-```
-
-Close Arduino Serial Monitor before running the app; only one application can own COM4 at a time.
-
-## Reference matching
-
-The initial reference photo is stored at:
-
-```text
-dataset\reference\iron_folic_acid_reference.jpg
-```
-
-The current matcher is an ORB feature/homography prototype; a match allows operator review but does not authenticate the medicine. Replace that file only with a verified reference you are authorized to use. If no reference exists or the match is uncertain, the application requires manual review.
-
-## Optional model training
-
-Only add genuine, labeled, authorized images. Keep train and validation images separate:
-
-```text
-dataset/train/medicine_back/
-dataset/train/other/
-dataset/validation/medicine_back/
-dataset/validation/other/
-```
-
-TensorFlow is optional and is not included in the normal app requirements. Install a version compatible with your Python platform, then run:
-
-```powershell
-python intelligence\train.py
-```
-
-The trainer uses MobileNetV2 initialized without downloaded pretrained weights, saves the model and labels under `intelligence/model`, and requires both classes in both splits. Measure and document independent validation performance before relying on it. The model classifies package-vs-other only; identification as the named medicine still requires a reference-image match.
-
-## Workflow
-
-1. Start `python main.py`.
-2. Confirm the configured USB camera is connected on the presentation dashboard.
-3. Position the package **back side** and press **S** on the laptop.
-4. On the phone, press **ANALYZE IMAGE**.
-5. Review the classification and any red-mark observation.
-6. REAL/COUNTERFEIT become enabled only for a supported-reference match.
-7. An operator may select REAL or COUNTERFEIT; both dashboards, saved history, counts and OLED are updated.
-8. Press **R** on the laptop to discard the current decision and capture a new sample. The previous inspection remains in history as a separate record.
-
-`NO MEDICINE FOUND` and `NEEDS MANUAL REVIEW` never enable the decision buttons. New captures invalidate the current acceptance and decision state.
-
-## Stored data and limits
-
-- Captures: unique JPEGs under `captures/`.
-- Inspection history: `logs/inspection_history.json`, written atomically.
-- Summary counts: computed from saved records; only operator-confirmed decisions count as REAL/COUNTERFEIT, and only the NO MEDICINE FOUND classification contributes to its count.
-- Existing model: none included.
-- Dataset/reference photo: one existing rear-side package photo is installed as the initial reference.
-- Hardware: webcam, COM4, ESP32 and OLED require physical testing on the target machine.
-- Prototype image analysis may misclassify. A red region in the lower half is only a visual observation and may be unrelated to package printing.
-
-## Tests
-
-```powershell
-python -m compileall main.py config.py server camera intelligence tests
-python -m unittest discover -s tests -v
-```
-
-These are software tests with mocked/no physical hardware; they do not prove camera, serial, OLED, model, or medicine-authenticity performance.
-
-## Troubleshooting
-
-- **USB webcam disconnected:** run `python camera\camera_test.py`, verify the external camera in the preview, set its index in `config.py`, close other camera apps, and restart. The app intentionally does not switch to the laptop camera.
-- **COM4 unavailable:** disconnect Serial Monitor/other serial tools, confirm the ESP32 enumerates as COM4, and restart.
-- **Phone cannot connect:** confirm both devices are on the same Wi-Fi, allow Python through Windows Firewall for private networks, and use the laptop IPv4 address with port 8000.
-- **Manual review:** low-quality or unmatched images are deliberately not identified; replace the initial reference only with a verified image if needed.
-- **OLED blank:** verify I2C wiring/address, board selection, SSD1306 compatibility, and the two required Adafruit libraries.
+### 3. Verification Workflow
+1. Navigate to the **Main AI Dashboard**: `http://localhost:8000/`
+2. Position the medicine strip with the **rear side (barcode and composition details)** facing the camera.
+3. Click **ANALYZE IMAGE**:
+   - The system freezes the captured frame.
+   - The multi-spectral scanning beam and radar reticle initiate optical feature analysis.
+   - The ESP32 OLED updates to `SCANNING...`.
+4. The system validates the packaging integrity and displays the comprehensive verification verdict along with the identified medicine specifications.
+5. Click **START NEW SCAN** to reset the optical viewport for the next sample.

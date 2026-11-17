@@ -1,19 +1,33 @@
-# Optional image analysis
+# MEDCHECK - PI AI Module
 
-The normal application uses OpenCV prototype checks and an optional reference-image match. The only supported identification is **Iron and Folic Acid Tablets IP**. Without its genuine reference photo, package-like images go to manual review.
+This folder contains the optional experimental image-classification area.
 
-Copy a genuine, authorized reference image to `dataset/reference/iron_folic_acid_reference.jpg`. A visual match does not establish medicine authenticity.
+## Intended structure
 
-Optional binary training data:
+- `dataset/train/medicine_back/` : genuine rear-side medicine packaging examples
+- `dataset/train/other/` : unrelated images for negative examples
+- `dataset/validation/medicine_back/` : validation samples
+- `dataset/validation/other/` : validation negatives
+- `model/` : trained classifier output, if available
 
-```text
-dataset/
-  train/
-    medicine_back/
-    other/
-  validation/
-    medicine_back/
-    other/
+## Important note
+
+The live MEDCHECK - PI demo does not claim to verify real medicine authenticity. The operator's REAL/FAKE choice is a demonstration result only, not a physical authenticity judgment.
+
+If a true labelled dataset is not available, the app intentionally uses the prototype validation fallback and clearly labels it as `PROTOTYPE IMAGE VALIDATION — NOT A TRAINED AI MODEL`.
+
+## Training
+
+Run the experimental trainer when real image data is available:
+
+```bash
+python intelligence/train.py
 ```
 
-Train by running `python intelligence/train.py` after installing a compatible TensorFlow package. Training requires real images in every class/split and writes `intelligence/model/trained_model.keras`. The classifier can help distinguish package-like images from other images, but cannot identify this medicine by itself. A separate reference match is still required. Evaluate against independent data; no performance is claimed by this project.
+## Prediction
+
+When a trained model is present, use:
+
+```bash
+python intelligence/predict.py path/to/image.jpg
+```
