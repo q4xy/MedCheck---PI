@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MEDCHECK PI | Inspection Display</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main_dashboard.css') }}">
+</head>
+<body>
+  <main class="dashboard">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SMART MEDICINE INSPECTION SYSTEM</p>
+        <h1>MEDCHECK <span>PI</span></h1>
+      </div>
+      <div class="system-status">
+        <span class="status-dot"></span><span id="system-state">SYSTEM ONLINE</span>
+        <span class="status-divider"></span><span id="camera-indicator">USB WEBCAM CHECKING</span>
+        <span class="status-divider"></span><span id="esp32-indicator">ESP32 CHECKING</span>
+        <time id="clock-indicator">--:--:--</time>
+      </div>
+    </header>
+
+    <section class="summary-grid" aria-label="Inspection totals">
+      <article class="summary-card counterfeit-card">
+        <span class="summary-icon" aria-hidden="true">!</span>
+        <div><strong id="counterfeit-count">0</strong><span>COUNTERFEIT</span></div>
+      </article>
+      <article class="summary-card real-card">
+        <span class="summary-icon" aria-hidden="true">✓</span>
+        <div><strong id="real-count">0</strong><span>REAL</span></div>
+      </article>
+      <article class="summary-card neutral-card">
+        <span class="summary-icon" aria-hidden="true">⌕</span>
+        <div><strong id="no-medicine-count">0</strong><span>NO MEDICINE FOUND</span></div>
+      </article>
+    </section>
+
+    <section class="work-grid">
+      <article class="panel camera-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">LIVE INPUT</p><h2>REAR-SIDE CAMERA</h2></div>
+          <span id="camera-name" class="camera-label">USB WEBCAM DISCONNECTED</span>
+        </div>
+        <div class="camera-frame">
+          <img id="live-preview" src="/camera/stream" alt="Configured external USB webcam stream">
+          <div id="scan-overlay" class="scan-overlay hidden"><span class="scan-line"></span><b>ANALYZING IMAGE</b></div>
+        </div>
+        <p class="keyboard-hint">LAPTOP KEYBOARD: <kbd>S</kbd> CAPTURE <span>·</span> <kbd>R</kbd> RETAKE</p>
+      </article>
+
+      <article class="panel captured-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">CURRENT INSPECTION</p><h2>CAPTURED IMAGE</h2></div>
+          <span id="inspection-time" class="camera-label">AWAITING CAPTURE</span>
+        </div>
+        <div class="captured-frame">
+          <img id="captured-image" alt="Latest captured medicine package" hidden>
+          <div id="image-empty" class="empty-state"><span>＋</span><p>CAPTURE THE PACKAGE BACK SIDE</p></div>
+        </div>
+        <div class="inspection-details">
+          <div><span class="detail-label">IDENTIFICATION</span><strong id="classification">WAITING FOR CAPTURE</strong><small id="analysis-confidence" class="confidence-label" hidden></small></div>
+          <div><span class="detail-label">SUPPORTED MEDICINE</span><strong>IRON AND FOLIC ACID TABLETS IP</strong></div>
+          <div><span class="detail-label">VISUAL OBSERVATION</span><p id="red-observation">No red marking observation yet.</p></div>
+          <div><span class="detail-label">LATEST OPERATOR RESULT</span><strong id="operator-result">NOT SELECTED</strong></div>
+          <p id="analysis-message" class="analysis-message">Capture the rear side of the supported medicine package.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel history-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">SAVED INSPECTIONS</p><h2>RECENT HISTORY</h2></div>
+        <span class="history-note">Counts reflect saved inspection records only</span>
+      </div>
+      <div id="history-list" class="history-list"><p class="empty-history">No inspection history yet.</p></div>
+    </section>
+    <footer>Packaging appearance is not proof of medicine authenticity. REAL / COUNTERFEIT are operator-selected demo decisions.</footer>
+  </main>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='js/main_dashboard.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MEDCHECK PI | Operator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}">
+</head>
+<body>
+  <main class="operator-shell">
+    <header class="operator-header">
+      <div><p class="eyebrow">SMART MEDICINE INSPECTION SYSTEM</p><h1>MEDCHECK <span>PI</span></h1></div>
+      <div class="connection"><i id="camera-dot"></i><span id="camera-status">USB WEBCAM CHECKING</span></div>
+    </header>
+
+    <section class="capture-card">
+      <div class="section-title"><span>01</span><div><p class="eyebrow">CURRENT SAMPLE</p><h2>CAPTURED PACKAGE</h2></div></div>
+      <div class="capture-image">
+        <img id="operator-image" alt="Captured rear-side medicine package" hidden>
+        <div id="operator-image-empty" class="empty-state">Waiting for laptop capture</div>
+        <div id="operator-scan-overlay" class="scan-overlay hidden"><span class="scan-line"></span><b>ANALYZING IMAGE</b></div>
+      </div>
+      <div class="recognition">
+        <span class="eyebrow">MEDICINE RECOGNITION</span>
+        <strong id="operator-classification">WAITING FOR CAPTURE</strong>
+        <small id="operator-confidence" class="confidence-label" hidden></small>
+        <p id="operator-message">Capture the rear side using the laptop keyboard, then analyze it.</p>
+        <p id="operator-observation" class="observation"></p>
+        <p class="supported-name">Supported reference: Iron and Folic Acid Tablets IP</p>
+      </div>
+    </section>
+
+    <section class="decision-card">
+      <div class="section-title"><span>02</span><div><p class="eyebrow">OPERATOR ACTION</p><h2>REVIEW RESULT</h2></div></div>
+      <div class="button-stack">
+        <button id="analyze-button" class="action analyze" type="button" disabled>ANALYZE IMAGE</button>
+        <button class="action real decision" data-result="REAL" type="button" disabled>REAL</button>
+        <button class="action counterfeit decision" data-result="COUNTERFEIT" type="button" disabled>COUNTERFEIT</button>
+      </div>
+      <p class="decision-note">REAL and COUNTERFEIT are manual demo decisions, not authenticity verification.</p>
+      <div class="current-result"><span>Latest decision</span><strong id="operator-result">NOT SELECTED</strong></div>
+    </section>
+    <footer><span id="socket-status">Connecting to laptop…</span><span>Same local Wi-Fi network</span></footer>
+  </main>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='js/admin_dashboard.js') }}"></script>
+</body>
+</html>
